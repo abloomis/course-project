@@ -1,2 +1,3 @@
 # course-project
-CS361 course project repo
+
+This is the repository I will use for my course project in CS361 - software engineering.
