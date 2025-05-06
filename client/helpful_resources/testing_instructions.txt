@@ -1,2 +1,5 @@
 In the terminal, navigate to the \ranking_app\client directory
+    this can be done easily from \ranking_app by typing 'cd cli' and pressing tab, then enter
 Then, type 'npm run dev' and press enter in the terminal
+
+When done testing, use ctrl + c to finish using local host
