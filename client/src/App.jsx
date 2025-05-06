@@ -12,14 +12,11 @@ import Navigation from './components/Navigation.jsx';
 
 function App() {
 // establish the page routing
-// (header and footer are shown on every page)
   return (
     
     <div className="app">
 
-      {/* navigation is shown on all pages */}
-      <Navigation/>
-
+      {/* this header is shown on all pages */}
       <header>
         <h1>Ranking Tool</h1>
       </header>
@@ -29,9 +26,13 @@ function App() {
         <Route path='/import' element={<ImportPage />} />
         <Route path='/faq' element={<FAQPage />} />
         <Route path='/tutorials' element={<TutorialsPage />} />
-        <Route path="/edit" element={<EditPage />} />
+        <Route path='/edit' element={<EditPage />} />
       </Routes>
       
+      {/* navigation options for tutorials + faq is shown on all pages */}
+      <Navigation/>
+
+      {/* this footer is shown on all pages */}
       <footer>
         <p> © 2025 alex loomis</p>
       </footer>

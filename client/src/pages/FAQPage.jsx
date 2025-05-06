@@ -8,7 +8,7 @@ function FAQPage() {
       <dl>
         <dt>How do I upload data?</dt>
         <dd>
-          You can upload a file in either CSV or TSV format. Or, you can manually add data using our integrated spreadsheet-like data editing tool.
+          You can upload a file in either CSV or TSV format. Or, you can manually add data using the integrated spreadsheet-like data editing tool.
         </dd>
 
         <dt>How should I format uploaded data?</dt>

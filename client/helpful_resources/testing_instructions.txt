@@ -1,0 +1,2 @@
+In the terminal, navigate to the \ranking_app\client directory
+Then, type 'npm run dev' and press enter in the terminal

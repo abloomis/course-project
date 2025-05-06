@@ -8,9 +8,6 @@ function ImportPage() {
   const [error,setError] = useState(null);
   const navigate = useNavigate();
 
-  setFileName(file.name);
-  setError(null);
-
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if(!file) return;
@@ -21,6 +18,9 @@ function ImportPage() {
       setFileName(null);
       return;
     }
+
+    setFileName(file.name);
+    setError(null);
 
     // read the csv file and create a matrix of the data
     const reader = new FileReader();
