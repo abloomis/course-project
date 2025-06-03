@@ -1,5 +1,20 @@
-In the terminal, navigate to the \ranking_app\client directory
-    this can be done easily from \ranking_app by typing 'cd cli' and pressing tab, then enter
-Then, type 'npm run dev' and press enter in the terminal
+In the terminal, navigate to the \ranking_app\client directory.
+    The full path is C:\CS_courses\CS361\ranking_app\client>
 
-When done testing, use ctrl + c to finish using local host
+Then, type 'npm run dev' and press enter in the terminal. This should print the following:
+ VITE v6.3.4  ready in 765 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
+
+Visit the localhost link (ctr + click on it)
+
+When finished with testing, use ctrl + c in the terminal to close the port.
+
+Run python app.py in a separate terminal to start the proxy server on port 5000.
+    The full path is C:\CS_courses\CS361\ranking_app\flask>
+    This is needed for running the flask service (which allows the python microservices
+    to run on python sockets while still working with http requests)
+        Note that this also requires having downloaded flask with "pip flask" while in 
+        the /flask directory as well as flask_cors using "pip flask-cors"

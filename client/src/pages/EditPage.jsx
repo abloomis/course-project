@@ -72,6 +72,62 @@ function EditPage() {
     link.click();
     document.body.removeChild(link);
   };
+
+  // ----------------- function for generating heatmaps -----------------
+  const [heatmapUrl,setHeatmapUrl] = useState(null);
+
+  const handleGenerateHeatmap = async () => {
+    const headers = table.headers;
+    const rows = table.rows;
+
+    // convert table to csv string
+    const csvRows = [];
+    csvRows.push(['', ...headers].join(','));
+    rows.forEach(row => {
+      csvRows.push([row.name, ...row.data].join(','));
+    });
+    const csvString = csvRows.join('\n');
+
+    // turn csv string into a file-like object
+    const blob = new Blob([csvString], {type: 'text/csv'});
+    const formData = new FormData();
+    formData.append('file', blob, 'league_data.csv');
+
+    // step 1: upload the csv to flask
+    const uploadRes = await fetch('http://localhost:5000/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!uploadRes.ok) {
+      const {error} = await uploadRes.json();
+      alert(`error uploading csv: ${error}`);
+      return;
+    }
+
+    const {filename} = await uploadRes.json();
+
+    // step 2: request the heatmap using the filename
+    const heatmapRes = await fetch('http://localhost:5000/heatmap', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        filename,
+        color: '#00FF00 #FFFF00 #FF0000'
+      })
+    });
+
+    if (!heatmapRes.ok) {
+      const {error} = await heatmapRes.json();
+      alert(`error generating heatmap: ${error}`);
+      return;
+    }
+
+  // show image preview
+  const blobImage = await heatmapRes.blob();
+  const url = URL.createObjectURL(blobImage);
+  setHeatmapUrl(url);
+};
   
 
   // create an html table with interactable cells
@@ -128,12 +184,21 @@ function EditPage() {
 
       <button onClick={handleExport}>Export to a CSV file</button>
 
-      
+      <button onClick={handleGenerateHeatmap}>Generate Heatmap</button>
 
-
+      {heatmapUrl && (
+        <div style={{marginTop: '1rem'}}>
+          <p>Heatmap preview:</p>
+          <a href={heatmapUrl} target="_blank" rel="noopener noreferrer" style={{display:'inline-block'}}>
+            <img
+              src={heatmapUrl}
+              alt="heatmap preview"
+              style={{maxWidth: '400px', height: 'auto', cursor: 'pointer', border: '1px solid #ccc'}}
+            />
+          </a>
+        </div>
+      )}
     </div>
-
-    
   );
 }
 
