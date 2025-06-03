@@ -1,48 +1,38 @@
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import os
-# Assuming client_socket and its functions (upload_csv, request_heatmap) are correctly defined elsewhere
-# and handle communication with other microservices (e.g., for heatmap generation).
-# For the purpose of this problem, we'll focus on the ranking logic.
-# from client_socket import upload_csv, request_heatmap
 from werkzeug.utils import secure_filename
-import tempfile
 import requests
+import tempfile
+
+# Import the functions from your client_socket.py
+# Ensure client_socket.py is in the same directory as app.py
+from client_socket import upload_csv, request_heatmap
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
+
+# --- CORS Configuration ---
+# This allows your React frontend (on port 5173) to communicate with this Flask backend (on port 5000).
+# In development, it's often easiest to allow all origins for all routes.
+# For production, you would restrict 'origins' to your frontend's actual domain.
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+# --- End CORS Configuration ---
+
+# Directory for temporary file uploads (e.g., for heatmap CSV before sending to remote)
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Placeholder for client_socket functions if they are not provided
-# In a real scenario, you would have these implemented or imported.
-def upload_csv(filepath):
-    print(f"Simulating CSV upload for heatmap: {filepath}")
-    # This would typically send the file to your heatmap microservice
-    pass
 
-def request_heatmap(filename, color_string):
-    print(f"Simulating heatmap request for {filename} with color {color_string}")
-    # This would typically make a request to your heatmap microservice
-    # and return the image data. For now, returning dummy data.
-    return b"dummy_image_data"
+# --- Microservice Communication Functions ---
 
-
-# algorithm microservice
-# IMPORTANT CHANGE: Added algorithm_type parameter
+# Algorithm microservice communication (assuming it's on localhost:5050)
 def get_ranking_from_microservice(table, algorithm_type='default'):
     try:
         response = requests.post(
             'http://localhost:5050/rank',
-            # IMPORTANT CHANGE: Pass the algorithm_type in the JSON body
             json={'table': table, 'algorithm': algorithm_type}
         )
-
-        print(f"Ranking microservice responded with status: {response.status_code}")
-        print(f"Ranking microservice response body: {response.text}")
-
         if response.status_code != 200:
-            # Attempt to parse error message from microservice response
             error_data = response.json()
             return None, error_data.get('error', f'Unknown error from ranking microservice (Status: {response.status_code})')
         return response.json()['ranking'], None
@@ -55,9 +45,65 @@ def get_ranking_from_microservice(table, algorithm_type='default'):
     except Exception as e:
         return None, str(e)
 
-# upload csv file for heatmap microservice
-@app.route('/upload', methods=['POST'])
-def upload():
+
+# Export microservice communication (assuming it's on localhost:5051)
+def get_exported_ranking_data(table, ranking_scores, player_names):
+    try:
+        response = requests.post(
+            'http://localhost:5051/export_ranking_data',
+            json={
+                'table': table,
+                'ranking': ranking_scores,
+                'playerNames': player_names
+            }
+        )
+        if response.status_code != 200:
+            error_data = response.json()
+            return None, error_data.get('error', f'Unknown error from export microservice (Status: {response.status_code})')
+        
+        return response.content, None
+    except requests.exceptions.ConnectionError:
+        return None, "Could not connect to the export microservice. Is it running on port 5051?"
+    except requests.exceptions.Timeout:
+        return None, "Export microservice request timed out."
+    except requests.exceptions.RequestException as e:
+        return None, f"An error occurred during request to export microservice: {str(e)}"
+    except Exception as e:
+        return None, str(e)
+
+# Validation microservice communication (assuming it's on localhost:5052)
+def validate_data_with_microservice(headers, rows):
+    try:
+        response = requests.post(
+            'http://localhost:5052/validate_data',
+            json={
+                'headers': headers,
+                'rows': rows
+            }
+        )
+        if response.status_code != 200:
+            error_data = response.json()
+            return None, error_data.get('error', f'Unknown error from validation microservice (Status: {response.status_code})')
+        
+        return response.json()['errors'], None
+    except requests.exceptions.ConnectionError:
+        return None, "Could not connect to the validation microservice. Is it running on port 5052?"
+    except requests.exceptions.Timeout:
+        return None, "Validation microservice request timed out."
+    except requests.exceptions.RequestException as e:
+        return None, f"An error occurred during request to validation microservice: {str(e)}"
+    except Exception as e:
+        return None, str(e)
+
+
+# --- Flask Routes (Endpoints for Frontend) ---
+
+@app.route('/upload_heatmap_csv', methods=['POST'])
+def upload_heatmap_csv_endpoint():
+    """
+    Receives a CSV file from the frontend, saves it locally, and sends it
+    to the remote heatmap upload server via client_socket.py.
+    """
     if 'file' not in request.files:
         return jsonify({"error":"No file part"}), 400
 
@@ -65,88 +111,133 @@ def upload():
     if file.filename == '':
         return jsonify({"error":"No selected file"}), 400
 
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(filepath)
-
+    temp_dir = None
+    local_filepath = None
     try:
-        print(f"Saved file to {filepath}")
-        upload_csv(filepath)
+        # Use tempfile to securely create a temporary file and directory
+        temp_dir = tempfile.mkdtemp()
+        # Secure filename to prevent directory traversal attacks
+        local_filepath = os.path.join(temp_dir, secure_filename(file.filename))
+        file.save(local_filepath)
+        print(f"Saved local temp file for heatmap upload: {local_filepath}")
+
+        # Use the imported upload_csv function from client_socket.py
+        upload_csv(local_filepath)
+        
+        # Return the basename of the file so the frontend can use it for the heatmap request
+        return jsonify({"message": "CSV uploaded to heatmap server successfully", "filename": os.path.basename(local_filepath)}), 200
+    except ConnectionError as e: # Catch custom ConnectionError from client_socket.py
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to connect to or upload CSV to remote heatmap server: {str(e)}"}), 500
     except Exception as e:
-        print(f"upload_csv() failed: {e}")
-        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An error occurred during CSV upload for heatmap: {str(e)}"}), 500
+    finally:
+        # Clean up the temporary file and directory
+        if local_filepath and os.path.exists(local_filepath):
+            os.remove(local_filepath)
+        if temp_dir and os.path.exists(temp_dir):
+            os.rmdir(temp_dir)
 
-    return jsonify({"message": "CSV uploaded successfully", "filename": filename}), 200
 
-@app.route('/heatmap', methods=['POST'])
-def heatmap():
+@app.route('/request_heatmap_image', methods=['POST'])
+def request_heatmap_image_endpoint():
+    """
+    Requests a heatmap image from the remote heatmap generator server
+    via client_socket.py, using the filename previously uploaded.
+    """
     data = request.json
-    filename = data.get('filename')
+    filename = data.get('filename') # This is the original filename (basename)
     color_string = data.get('color', '')
 
     if not filename:
-        return jsonify({"error": "Missing filename"}), 400
+        return jsonify({"error": "Missing filename for heatmap request"}), 400
 
     try:
+        # Use the imported request_heatmap function from client_socket.py
         image_data = request_heatmap(filename, color_string)
+        
+        # Flask's send_file can be used, but for raw bytes, creating a response directly is fine
+        response = app.make_response(image_data)
+        response.headers["Content-Type"] = "image/png"
+        return response
+
+    except ConnectionError as e: # Catch custom ConnectionError from client_socket.py
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to connect to or retrieve heatmap from remote server: {str(e)}"}), 500
     except Exception as e:
-        return jsonify({"error": f"Heatmap generation failed: {str(e)}"}), 500
-
-    # Save image into your static folder (make sure it exists)
-    static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
-    if not os.path.exists(static_folder):
-        os.makedirs(static_folder)
-    img_filename = f"heatmap_{filename}.png"
-    img_path = os.path.join(static_folder, img_filename)
-
-    with open(img_path, "wb") as f:
-        f.write(image_data)
-
-    # Return JSON with URL to image
-    return jsonify({"url": f"/static/{img_filename}"})
-
-# Serve static files from the 'static' folder
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
-    return send_file(os.path.join(static_folder, filename))
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An error occurred during heatmap generation: {str(e)}"}), 500
 
 
-@app.route('/rank', methods=['POST', 'OPTIONS'])
-def rank_endpoint_for_frontend():
-    # Handle the CORS preflight OPTIONS request
-    if request.method == 'OPTIONS':
-        print("Received OPTIONS preflight request for /rank from frontend.")
-        return '', 200 # Return 200 OK for preflight
+@app.route('/rank', methods=['POST'])
+def rank_endpoint():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
 
-    # Handle the actual POST request
-    if request.method == 'POST':
-        print("Received POST request for /rank from frontend.")
-        try:
-            data = request.get_json()
-            table = data.get('table')
-            # IMPORTANT CHANGE: Retrieve algorithm_type from frontend request
-            algorithm_type = data.get('algorithm', 'default') # Default if not provided
+    table = data.get('table')
+    algorithm = data.get('algorithm', 'default')
 
-            if not table:
-                print("Error: 'table' data is missing in the request from frontend.")
-                return jsonify({'error': 'Missing "table" data'}), 400
+    if not table:
+        return jsonify({"error": "Missing 'table' data for ranking"}), 400
 
-            # Call the internal function to get ranking from the microservice
-            # IMPORTANT CHANGE: Pass the retrieved algorithm_type
-            ranks, error = get_ranking_from_microservice(table, algorithm_type)
+    ranking, error = get_ranking_from_microservice(table, algorithm)
 
-            if error:
-                print(f"Error from ranking microservice call: {error}")
-                return jsonify({'error': error}), 500
+    if error:
+        return jsonify({"error": error}), 500
+    return jsonify({"ranking": ranking}), 200
 
-            print(f"Successfully received ranks from microservice: {ranks}")
-            return jsonify({'ranking': ranks})
 
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return jsonify({'error': f'Internal server error processing rank request: {str(e)}'}), 500
+@app.route('/export_ranking', methods=['POST'])
+def export_ranking_endpoint():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+    
+    table = data.get('table')
+    ranking = data.get('ranking')
+    player_names = data.get('playerNames')
+
+    if not all([table, ranking, player_names]):
+        return jsonify({"error": "Missing table, ranking, or playerNames data for export"}), 400
+
+    exported_data, error = get_exported_ranking_data(table, ranking, player_names)
+
+    if error:
+        return jsonify({"error": error}), 500
+    
+    # Assuming exported_data is bytes (e.g., CSV content)
+    response = app.make_response(exported_data)
+    response.headers["Content-Type"] = "text/csv"
+    response.headers["Content-Disposition"] = "attachment; filename=league_ranking_data.csv"
+    return response
+
+
+@app.route('/validate', methods=['POST'])
+def validate_data_endpoint():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+    
+    headers = data.get('headers')
+    rows = data.get('rows')
+
+    if not all([headers, rows is not None]): # rows can be empty, but not None
+        return jsonify({"error": "Missing headers or rows data for validation"}), 400
+    
+    errors, error_message = validate_data_with_microservice(headers, rows)
+
+    if error_message:
+        return jsonify({"error": error_message}), 500
+    
+    return jsonify({"errors": errors}), 200 # Return the list of errors
+
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    # Flask app runs on port 5000, listening for requests from your React frontend
+    app.run(port=5000, debug=True) # debug=True provides more detailed error messages

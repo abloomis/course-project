@@ -1,11 +1,13 @@
+/* Global root variables and base styling */
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  /* Set a light theme as default */
+  color-scheme: light; /* Explicitly declare light color scheme */
+  color: #213547; /* Darker text for light background */
+  background-color: #ffffff; /* White background */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -13,56 +15,46 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Basic link styling */
 a {
   font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+  color: #007bff; /* Primary blue for links, matching button primary */
+  text-decoration: none; /* Remove underline by default */
+  transition: color 0.25s ease;
 }
 
+a:hover {
+  color: #0056b3; /* Darker blue on hover */
+  text-decoration: underline; /* Add underline on hover for clarity */
+}
+
+/* Body styling: Keep it minimal here, App.css will layer on more specific styles */
 body {
   margin: 0;
   display: flex;
-  place-items: center;
+  place-items: center; /* Centers content vertically and horizontally within the body */
   min-width: 320px;
   min-height: 100vh;
+  /* Ensure background color is consistent */
+  background-color: #f4f7f6; /* Matching the App.css body background */
 }
 
+/* Base heading style - can be overridden by App.css for specific headings */
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
+  color: #2c3e50; /* Matching the h1 color in App.css */
 }
 
+/* Remove conflicting button styles from here */
+/* Button styling will be handled by App.css for more detailed control */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
+  /* You can leave very basic resets if you want, but the detailed styles
+     from App.css will override these. It's often cleaner to remove
+     specific styling that's being fully defined elsewhere. */
   font-family: inherit;
-  background-color: #1a1a1a;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  /* Removed other button styles */
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}
+/* Removed media query for light theme, as light theme is now default */
